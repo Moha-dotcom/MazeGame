@@ -1,91 +1,165 @@
-var Example = Example || {};
+const { Engine, Render, Runner, World, Bodies} = Matter;
 
-Example.stats = function() {
-    var Engine = Matter.Engine,
-        Render = Matter.Render,
-        Runner = Matter.Runner,
-        Common = Matter.Common,
-        Composites = Matter.Composites,
-        MouseConstraint = Matter.MouseConstraint,
-        Mouse = Matter.Mouse,
-        World = Matter.World,
-        Bodies = Matter.Bodies;
+const engine = Engine.create();// Create A 
+const { world } = engine; 
 
-    // create engine
-    var engine = Engine.create(),
-        world = engine.world;
+let width =  800;
+let height =  800
 
-    // create renderer
-    var render = Render.create({
-        element: document.body,
-        engine: engine,
-        options: {
-            width: 800,
-            height: 600,
-            // show stats and performance monitors
-            showStats: true,
-            showPerformance: true
-        }
-    });
+const render = Render.create({
+  element: document.body,
 
-    Render.run(render);
+  engine: engine,
+  options: {
+    wireframes : true,
+    width,
+    height
+  }
+});
+Render.run(render);
+Runner.run(Runner.create(), engine); 
 
-    // create runner
-    var runner = Runner.create();
-    Runner.run(runner, engine);
 
-    // scene code
-    var stack = Composites.stack(70, 30, 13, 9, 5, 5, function(x, y) {
-        return Bodies.circle(x, y, 10 + Common.random() * 20);
-    });
-    
-    World.add(world, [
-        stack,
-        Bodies.rectangle(400, 0, 800, 50, { isStatic: true }),
-        Bodies.rectangle(400, 600, 800, 50, { isStatic: true }),
-        Bodies.rectangle(800, 300, 50, 600, { isStatic: true }),
-        Bodies.rectangle(0, 300, 50, 600, { isStatic: true })
-    ]);
 
-    // add mouse control
-    var mouse = Mouse.create(render.canvas),
-        mouseConstraint = MouseConstraint.create(engine, {
-            mouse: mouse,
-            constraint: {
-                stiffness: 0.2,
-                render: {
-                    visible: false
-                }
+const wall = [
+    Bodies.rectangle(width/ 2, 0, width, 40 , {isStatic : true}),
+    Bodies.rectangle(width /2, height, width, 40 , {isStatic : true}),
+    Bodies.rectangle(0, height / 2, 40, height , {isStatic : true}),
+    Bodies.rectangle(width, height /2, 40, height , {isStatic : true})
+]
+
+World.add(world, wall)
+
+const cell = 20;
+let unitLength = height / cell;
+const grid = Array(cell).fill(null).map(() =>  Array(cell).fill(false)); 
+const vertical = Array(cell).fill(null).map(() =>  Array(cell -1).fill(false)); 
+const Horizaontal = Array(cell -1).fill(null).map(() =>  Array(cell).fill(false)); 
+console.log(grid)
+
+
+// Shuffling the Neighbors Visisted
+function shuffle(array) {
+    let currentIndex = array.length,  randomIndex;
+  
+    // While there remain elements to shuffle.
+    while (currentIndex != 0) {
+  
+      // Pick a remaining element.
+      randomIndex = Math.floor(Math.random() * currentIndex);
+      currentIndex--;
+  
+      // And swap it with the current element.
+      [array[currentIndex], array[randomIndex]] = [
+        array[randomIndex], array[currentIndex]];
+    }
+  
+    return array;
+  }
+
+ 
+const startRow = Math.floor(Math.random() * cell)
+const StartCol = Math.floor(Math.random() * cell)
+
+const StepThroughCell = (row , colum) => {
+    // If i have visited the cell at [row, column] then return 
+
+    if(grid[row][colum]) return;
+    // Mark this cell as Visited
+    grid[row][colum] = true;
+    //Assemble randomly-ordered list of neighbors
+
+    const neighbor = [
+        [row - 1, colum, 'up'],
+        [row, colum + 1, 'right'],
+        [row + 1, colum, 'down'],
+        [row, colum -1, 'left'],
+    ]
+shuffle(neighbor);
+
+
+
+
+    // For each neighor 
+
+        for(let neighbors of neighbor ){
+            const [nextRow, nextColumn, direction] = neighbors;
+
+            if(nextRow < 0 || nextRow >= cell ||nextColumn < 0 || nextColumn >= cell ){
+                continue;
             }
-        });
 
-    World.add(world, mouseConstraint);
 
-    // keep the mouse in sync with rendering
-    render.mouse = mouse;
+            if(grid[nextRow][nextColumn]){
+                continue;
+            }
 
-    // fit the render viewport to the scene
-    Render.lookAt(render, {
-        min: { x: 0, y: 0 },
-        max: { x: 800, y: 600 }
-    });
 
-    // context for MatterTools.Demo
-    return {
-        engine: engine,
-        runner: runner,
-        render: render,
-        canvas: render.canvas,
-        stop: function() {
-            Matter.Render.stop(render);
-            Matter.Runner.stop(runner);
+        if(direction === 'left'){
+            vertical[row][colum-1] = true;
+        }else if(direction === 'right'){
+            vertical[row][colum] = true;
+        }else  if(direction === 'up'){
+            Horizaontal[row-1][colum] =true
+        }else  if(direction === 'down'){
+            Horizaontal[row][colum] =true
         }
-    };
-};
 
-Example.stats.title = 'Stats & Performance';
-Example.stats.for = '>=0.16.1';
+        StepThroughCell(nextRow, nextColumn)
 
-if (typeof module !== 'undefined') {
-    module.exports = Example.stats;
+        }
+
+
+
+        // - see if that neighbor is out of the bounds
+        // If we visited that neighbor , continue to the next neighbor
+        // Remove a wall from either horizonatal or verticals
+        // visit the next cell
+
 }
+
+
+
+StepThroughCell(startRow, StartCol)
+
+
+Horizaontal.forEach((row, rowindex) => {
+   row.forEach((open, columnindex) => {
+    if(open) {
+        return
+    }else{
+        const wall = Bodies.rectangle(
+            columnindex * unitLength  + unitLength / 2,
+             rowindex * unitLength + unitLength,
+             unitLength, 
+             10,
+             {isStatic : true});
+
+            World.add(world, wall)
+
+    }
+   })
+
+})
+
+
+
+vertical.forEach((row, rowindex) => {
+    row.forEach((open, columnindex) => {
+     if(open) {
+         return
+     }else{
+         const wall = Bodies.rectangle(
+            columnindex * unitLength  + unitLength,
+            rowindex * unitLength + unitLength / 2,
+            10,
+            unitLength,
+            {isStatic : true}
+            );
+ 
+             World.add(world, wall)
+ 
+     }
+    })
+ 
+ })
